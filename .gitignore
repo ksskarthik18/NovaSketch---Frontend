@@ -1,0 +1,82 @@
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# =========================
+# Logs
+# =========================
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+bun-debug.log*
+
+# =========================
+# Dependencies
+# =========================
+node_modules/
+
+# =========================
+# Bun
+# =========================
+.bun/
+bun.lockb
+# If you WANT to commit bun.lockb, remove the line above
+
+# =========================
+# Build outputs
+# =========================
+dist/
+build/
+out/
+.cache/
+.tmp/
+
+# =========================
+# React / Vite / CRA
+# =========================
+.vite/
+.eslintcache
+
+# =========================
+# Tailwind
+# =========================
+.tailwind-cache/
+tailwind.config.js.timestamp-*
+
+# =========================
+# Environment variables
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Socket.IO
+# =========================
+socket-io-debug.log*
+
+# =========================
+# Testing
+# =========================
+coverage/
+.nyc_output/
+
+# =========================
+# Optional: TypeScript
+# =========================
+*.tsbuildinfo
+
+# =========================
+# Optional: Production secrets
+# =========================
+*.pem
+*.key
