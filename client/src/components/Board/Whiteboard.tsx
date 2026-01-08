@@ -26,12 +26,15 @@ const GlobalStyles = () => (
   `}</style>
 );
 
-type ToolType = 'select' | 'pen' | 'eraser' | 'rectangle' | 'circle' | 'triangle' | 'arrow' | 'line' | 'diamond' | 'hexagon' | 'cloud';
+
 type BrushType = 'marker' | 'calligraphy' | 'airbrush';
 type StrokeType = 'solid' | 'dashed' | 'dotted';
 type EraserMode = 'object' | 'partial';
+type ToolType = 'select' | 'pen' | 'eraser' | 'rectangle' | 'circle' | 'triangle' | 'arrow' | 'line' | 'diamond' | 'hexagon' | 'cloud' | 'text';
+
 
 const CLOUD_PATH = "M 25,60 A 20,20 0 0,1 25,20 A 20,20 0 0,1 55,10 A 20,20 0 0,1 85,30 A 20,20 0 0,1 85,60 Q 85,75 50,75 Q 15,75 25,60 z";
+
 
 interface DrawingElement {
   id: string;
@@ -53,7 +56,13 @@ interface DrawingElement {
   tension?: number; // For brush smoothness
   shadowBlur?: number;
   cornerRadius?: number;
+  // NEW: Text properties
+  text?: string;
+  fontSize?: number;
+  fontFamily?: string;
 }
+
+
 
 const Whiteboard = () => {
   const { roomId } = useParams();
@@ -71,6 +80,12 @@ const Whiteboard = () => {
   const [eraserMode, setEraserMode] = useState<EraserMode>('object');
   const [cornerRadius, setCornerRadius] = useState(0);
   const [hasShadow, setHasShadow] = useState(false);
+
+
+  // --- NEW: TEXT TOOL STATE ---
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [textInput, setTextInput] = useState('');
+  const [textPosition, setTextPosition] = useState<{x: number, y: number} | null>(null);
 
   const isDrawing = useRef(false);
   const ydoc = useRef<Y.Doc>(new Y.Doc());
@@ -113,10 +128,51 @@ const Whiteboard = () => {
 
   // --- MOUSE DOWN ---
   const handleMouseDown = (e: any) => {
-    if (tool === 'select') {
-      if (e.target === e.target.getStage()) setSelectedId(null);
+      if (editingTextId) return;
+
+      if (tool === 'select') {
+        if (e.target === e.target.getStage()) setSelectedId(null);
+        return;
+      }
+
+        // NEW: Handle text tool click
+      if (tool === 'text') {
+      const stage = e.target.getStage();
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
+
+      // 🔥 Convert canvas coords → DOM coords
+      const stageBox = stage.container().getBoundingClientRect();
+
+      const domX = stageBox.left + pointer.x;
+      const domY = stageBox.top + pointer.y;
+
+      const newTextElement: DrawingElement = {
+        id: nanoid(),
+        tool: 'text',
+        color: color,
+        size: 16,
+        points: [],
+        x: pointer.x,
+        y: pointer.y,
+        text: '',
+        fontSize: 16,
+        fontFamily: 'Arial',
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        opacity: 1,
+      };
+
+      yElements.current.push([newTextElement]);
+
+      setEditingTextId(newTextElement.id);
+      setTextInput('');
+      setTextPosition({ x: domX, y: domY });
+
       return;
     }
+
 
     // 1. OBJECT ERASER
     if (tool === 'eraser' && eraserMode === 'object') {
@@ -240,6 +296,75 @@ const Whiteboard = () => {
     yElements.current.insert(index, [newEl]);
   };
 
+  // --- TEXT INPUT OVERLAY COMPONENT ---
+  const TextInputOverlay = () => {
+    if (!editingTextId || !textPosition) return null;
+
+    const handleTextSubmit = () => {
+      if (textInput.trim() === '') {
+        // If empty, delete the element
+        const index = yElements.current.toArray().findIndex(el => el.id === editingTextId);
+        if (index !== -1) yElements.current.delete(index, 1);
+      } else {
+        // Update the text element with the typed content
+        const index = yElements.current.toArray().findIndex(el => el.id === editingTextId);
+        if (index !== -1) {
+          const oldEl = yElements.current.get(index);
+          const newEl = { ...oldEl, text: textInput };
+          yElements.current.delete(index, 1);
+          yElements.current.insert(index, [newEl]);
+        }
+      }
+      
+      // Exit edit mode
+      setEditingTextId(null);
+      setTextInput('');
+      setTextPosition(null);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleTextSubmit();
+      } else if (e.key === 'Escape') {
+        // Cancel editing - remove empty text element
+        const index = yElements.current.toArray().findIndex(el => el.id === editingTextId);
+        if (index !== -1) yElements.current.delete(index, 1);
+        setEditingTextId(null);
+        setTextInput('');
+        setTextPosition(null);
+      }
+    };
+
+    return (
+      <input
+        type="text"
+        autoFocus
+        value={textInput}
+        onChange={(e) => setTextInput(e.target.value)}
+        // onBlur={handleTextSubmit}
+        onKeyDown={handleKeyDown}
+        style={{
+          position: 'fixed',
+          left: textPosition.x,
+          top: textPosition.y,
+          border: '2px solid #007bff',
+          padding: '4px 8px',
+          fontSize: '16px',
+          fontFamily: 'Arial',
+          color: color,
+          background: 'white',
+          outline: 'none',
+          minWidth: '100px',
+          zIndex: 1000,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        }}
+        placeholder="Type text..."
+      />
+    );
+  };
+
+
   return (
     <>
       <GlobalStyles />
@@ -312,6 +437,8 @@ const Whiteboard = () => {
             </Layer>
             </Stage>
         </div>
+
+        <TextInputOverlay />
 
         {/* --- MAIN TOOLBAR --- */}
         <div style={{ position: 'absolute', top: 0, left: 0, zIndex: 10, width: '100%', pointerEvents: 'none' }}>

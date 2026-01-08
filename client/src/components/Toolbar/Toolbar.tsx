@@ -2,10 +2,11 @@ import React from 'react';
 import { 
   Pencil, Eraser, MousePointer2, 
   Square, Circle, Triangle, ArrowRight, Minus, 
-  Diamond, Hexagon, Cloud 
+  Diamond, Hexagon, Cloud,
+  Type
 } from 'lucide-react';
 
-export type ToolType = 'select' | 'pen' | 'eraser' | 'rectangle' | 'circle' | 'triangle' | 'arrow' | 'line' | 'diamond' | 'hexagon' | 'cloud';
+export type ToolType = 'select' | 'pen' | 'eraser' | 'rectangle' | 'circle' | 'triangle' | 'arrow' | 'line' | 'diamond' | 'hexagon' | 'cloud' | 'text';
 
 interface ToolbarProps {
   tool: ToolType;
@@ -74,6 +75,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool, color, setColor, size,
         <div style={{ width: '1px', height: '24px', backgroundColor: '#e5e7eb', margin: '0 5px' }}></div>
         <ToolButton t="pen" icon={Pencil} title="Pencil" />
         <ToolButton t="eraser" icon={Eraser} title="Eraser" />
+        <ToolButton t="text" icon={Type} title="Text" />
       </div>
 
       <div style={{ width: '1px', height: '24px', backgroundColor: '#e5e7eb' }}></div>
