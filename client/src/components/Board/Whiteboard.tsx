@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Stage, Layer, Path, Rect, Ellipse, Line, RegularPolygon, Arrow, Transformer } from 'react-konva';
+import { Stage, Layer, Path, Rect, Ellipse, Line, RegularPolygon, Arrow, Transformer ,Text} from 'react-konva';
 import { nanoid } from 'nanoid';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { useParams } from 'react-router-dom';
 import { getSvgPathFromStroke } from '../../utils/getStroke';
 import Toolbar from '../Toolbar/Toolbar';
+
 
 // --- STYLES ---
 const GlobalStyles = () => (
@@ -407,6 +408,29 @@ const Whiteboard = () => {
                     // Here we stick to Path for stroke but apply opacity/dash.
                     return <Path {...commonProps} data={getSvgPathFromStroke(el.points, el.size)} fill={el.color} stroke={el.color} tension={el.tension} />;
                 }
+
+                if (el.tool === 'text') {
+                  return (
+                    <Text
+                      key={el.id}
+                      id={el.id}
+                      x={el.x}
+                      y={el.y}
+                      text={el.text || ''}
+                      fontSize={el.fontSize || 16}
+                      fontFamily={el.fontFamily || 'Arial'}
+                      fill={el.color}
+                      draggable={tool === 'select'}
+                      rotation={el.rotation || 0}
+                      scaleX={el.scaleX || 1}
+                      scaleY={el.scaleY || 1}
+                      opacity={el.opacity ?? 1}
+                      listening={tool === 'select' || tool === 'eraser'}
+                    />
+                  );
+                }
+
+
                 
                 if (el.tool === 'line') return <Line {...commonProps} points={el.points.flat()} />;
                 if (el.tool === 'arrow') return <Arrow {...commonProps} points={el.points.flat()} fill={el.color} pointerLength={10} pointerWidth={10} />;
