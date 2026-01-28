@@ -3,7 +3,7 @@ import {
   Pencil, Eraser, MousePointer2, 
   Square, Circle, Triangle, ArrowRight, Minus, 
   Diamond, Hexagon, Cloud,
-  Type
+  Type, Bold, Italic, Underline
 } from 'lucide-react';
 
 export type ToolType = 'select' | 'pen' | 'eraser' | 'rectangle' | 'circle' | 'triangle' | 'arrow' | 'line' | 'diamond' | 'hexagon' | 'cloud' | 'text';
@@ -15,10 +15,36 @@ interface ToolbarProps {
   setColor: (color: string) => void;
   size: number;
   setSize: (size: number) => void;
+  // Text formatting props
+  isBold?: boolean;
+  setIsBold?: (val: boolean) => void;
+  isItalic?: boolean;
+  setIsItalic?: (val: boolean) => void;
+  isUnderline?: boolean;
+  setIsUnderline?: (val: boolean) => void;
+  fontFamily?: string;
+  setFontFamily?: (val: string) => void;
+  onColorChange?: (color: string) => void;
+  selectedElement?: any;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool, color, setColor, size, setSize }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ 
+  tool, setTool, color, setColor, size, setSize,
+  isBold, setIsBold, 
+  isItalic, setIsItalic, isUnderline, setIsUnderline,
+  fontFamily, setFontFamily, onColorChange, selectedElement
+}) => {
   const isSizeActive = (s: number) => size === s;
+  
+  // Check if a text element is selected
+  const isTextSelected = selectedElement && selectedElement.tool === 'text';
+
+  // Helper to handle color changes
+  const handleColorChange = (newColor: string) => {
+    if (tool === 'eraser') setTool('pen');
+    setColor(newColor);
+    if (onColorChange) onColorChange(newColor);
+  };
 
   // Helper for Tool Icons
   const ToolButton = ({ t, icon: Icon, title }: { t: ToolType, icon: any, title: string }) => (
@@ -35,7 +61,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool, color, setColor, size,
     </button>
   );
 
-  // Helper for S/M/L Buttons (FIXED CENTERING)
+  // Helper for S/M/L Buttons
   const SizeButton = ({ s, label }: { s: number, label: string }) => (
     <button 
       onClick={() => setSize(s)}
@@ -46,16 +72,15 @@ const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool, color, setColor, size,
         backgroundColor: isSizeActive(s) ? '#fff' : '#f9f9f9',
         borderRadius: '6px', 
         cursor: 'pointer',
-        // --- CENTERING MAGIC ---
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
-        padding: 0,             // FORCE 0 padding
+        padding: 0,
         margin: 0,
         fontWeight: 'bold', 
         fontSize: '14px', 
         color: '#333',
-        lineHeight: 1           // Prevents text floating up/down
+        lineHeight: 1
       }}
     >
       {label}
@@ -67,7 +92,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool, color, setColor, size,
       position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)',
       display: 'flex', gap: '15px', padding: '10px 20px',
       backgroundColor: 'white', borderRadius: '12px',
-      boxShadow: '0 4px 10px rgba(0,0,0,0.1)', zIndex: 100, alignItems: 'center'
+      boxShadow: '0 4px 10px rgba(0,0,0,0.1)', zIndex: 100, alignItems: 'center',
+      flexWrap: 'wrap'
     }}>
       {/* 1. EDIT TOOLS */}
       <div style={{ display: 'flex', gap: '5px' }}>
@@ -94,7 +120,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool, color, setColor, size,
 
       <div style={{ width: '1px', height: '24px', backgroundColor: '#e5e7eb' }}></div>
 
-      {/* 3. SIZES (FIXED) */}
+      {/* 3. SIZES */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <div style={{ display: 'flex', gap: '5px' }}>
             <SizeButton s={5} label="S" />
@@ -108,10 +134,121 @@ const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool, color, setColor, size,
       {/* 4. COLORS */}
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
         {['#000000', '#ef4444', '#3b82f6', '#22c55e', '#f59e0b'].map((c) => (
-          <button key={c} onClick={() => { if(tool === 'eraser') setTool('pen'); setColor(c); }} style={{ width: '24px', height: '24px', backgroundColor: c, borderRadius: '50%', border: color === c ? '2px solid black' : '1px solid #ddd', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+          <button 
+            key={c} 
+            onClick={() => handleColorChange(c)} 
+            style={{ 
+              width: '24px', 
+              height: '24px', 
+              backgroundColor: c, 
+              borderRadius: '50%', 
+              border: color === c ? '2px solid black' : '1px solid #ddd', 
+              cursor: 'pointer', 
+              padding: 0, 
+              flexShrink: 0 
+            }} 
+          />
         ))}
-        <input type="color" value={color} onChange={(e) => { if(tool === 'eraser') setTool('pen'); setColor(e.target.value); }} style={{ width: '28px', height: '28px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent', padding: 0 }} />
+        <input 
+          type="color" 
+          value={color} 
+          onChange={(e) => handleColorChange(e.target.value)} 
+          style={{ 
+            width: '28px', 
+            height: '28px', 
+            border: 'none', 
+            cursor: 'pointer', 
+            backgroundColor: 'transparent', 
+            padding: 0 
+          }} 
+        />
       </div>
+
+      {/* 5. TEXT FORMATTING CONTROLS (shown when text tool is active or text is selected) */}
+      {(tool === 'text' || isTextSelected) && (
+        <>
+          <div style={{ width: '1px', height: '24px', backgroundColor: '#e5e7eb' }}></div>
+          
+          {/* Font Family Dropdown */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <select
+              value={fontFamily || 'Arial'}
+              onChange={(e) => setFontFamily?.(e.target.value)}
+              style={{
+                padding: '4px 8px',
+                borderRadius: '6px',
+                border: '1px solid #ddd',
+                fontSize: '12px',
+                cursor: 'pointer',
+                backgroundColor: 'white'
+              }}
+            >
+              <option value="Arial">Arial</option>
+              <option value="Times New Roman">Times New Roman</option>
+              <option value="Courier New">Courier New</option>
+              <option value="Georgia">Georgia</option>
+              <option value="Verdana">Verdana</option>
+              <option value="Comic Sans MS">Comic Sans MS</option>
+              <option value="Impact">Impact</option>
+              <option value="Helvetica">Helvetica</option>
+            </select>
+
+            {/* Bold Button */}
+            <button
+              onClick={() => setIsBold?.(!isBold)}
+              title="Bold"
+              style={{
+                backgroundColor: isBold ? '#e2e8f0' : 'transparent',
+                border: 'none',
+                padding: '6px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Bold size={18} />
+            </button>
+
+            {/* Italic Button */}
+            <button
+              onClick={() => setIsItalic?.(!isItalic)}
+              title="Italic"
+              style={{
+                backgroundColor: isItalic ? '#e2e8f0' : 'transparent',
+                border: 'none',
+                padding: '6px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Italic size={18} />
+            </button>
+
+            {/* Underline Button */}
+            <button
+              onClick={() => setIsUnderline?.(!isUnderline)}
+              title="Underline"
+              style={{
+                backgroundColor: isUnderline ? '#e2e8f0' : 'transparent',
+                border: 'none',
+                padding: '6px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Underline size={18} />
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };

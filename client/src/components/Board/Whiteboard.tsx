@@ -57,10 +57,12 @@ interface DrawingElement {
   tension?: number; // For brush smoothness
   shadowBlur?: number;
   cornerRadius?: number;
-  // NEW: Text properties
+  // Text properties
   text?: string;
   fontSize?: number;
   fontFamily?: string;
+  fontStyle?: string; // 'normal', 'bold', 'italic', 'bold italic'
+  textDecoration?: string; // 'none', 'underline'
 }
 
 
@@ -83,10 +85,16 @@ const Whiteboard = () => {
   const [hasShadow, setHasShadow] = useState(false);
 
 
-  // --- NEW: TEXT TOOL STATE ---
+  // --- TEXT TOOL STATE ---
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [textInput, setTextInput] = useState('');
   const [textPosition, setTextPosition] = useState<{x: number, y: number} | null>(null);
+  
+  // --- NEW: TEXT FORMATTING STATE ---
+  const [isBold, setIsBold] = useState(false);
+  const [isItalic, setIsItalic] = useState(false);
+  const [isUnderline, setIsUnderline] = useState(false);
+  const [fontFamily, setFontFamily] = useState('Arial');
 
   const isDrawing = useRef(false);
   const ydoc = useRef<Y.Doc>(new Y.Doc());
@@ -100,6 +108,24 @@ const Whiteboard = () => {
     return () => provider.disconnect();
   }, [roomId]);
 
+  // --- NEW: Update selected text element's properties ---
+  useEffect(() => {
+    if (selectedId) {
+      const selectedElement = elements.find(el => el.id === selectedId);
+      if (selectedElement && selectedElement.tool === 'text') {
+        // Sync the main color state with the selected text's color
+        setColor(selectedElement.color || '#000000');
+        
+        // Parse font style
+        const fontStyle = selectedElement.fontStyle || 'normal';
+        setIsBold(fontStyle.includes('bold'));
+        setIsItalic(fontStyle.includes('italic'));
+        setIsUnderline(selectedElement.textDecoration === 'underline');
+        setFontFamily(selectedElement.fontFamily || 'Arial');
+      }
+    }
+  }, [selectedId, elements]);
+
   // --- HELPERS ---
   const getDashArray = (type: StrokeType, width: number) => {
     if (type === 'dashed') return [width * 3, width * 2];
@@ -111,6 +137,29 @@ const Whiteboard = () => {
     if (bType === 'calligraphy') return { tension: 0.5, opacity: 0.8, shadowBlur: 0 };
     if (bType === 'airbrush') return { tension: 0.5, opacity: 0.5, shadowBlur: 20 };
     return { tension: 0, opacity: 1, shadowBlur: 0 }; // Marker
+  };
+
+  // --- NEW: Get font style string ---
+  const getFontStyle = () => {
+    if (isBold && isItalic) return 'bold italic';
+    if (isBold) return 'bold';
+    if (isItalic) return 'italic';
+    return 'normal';
+  };
+
+  // --- NEW: Update selected text element's formatting ---
+  const updateTextFormatting = (updates: Partial<DrawingElement>) => {
+    if (!selectedId) return;
+    
+    const index = yElements.current.toArray().findIndex(el => el.id === selectedId);
+    if (index === -1) return;
+    
+    const oldEl = yElements.current.get(index);
+    if (oldEl.tool !== 'text') return;
+    
+    const newEl = { ...oldEl, ...updates };
+    yElements.current.delete(index, 1);
+    yElements.current.insert(index, [newEl]);
   };
 
   // --- ERASER LOGIC ---
@@ -136,13 +185,13 @@ const Whiteboard = () => {
         return;
       }
 
-        // NEW: Handle text tool click
+        // Handle text tool click
       if (tool === 'text') {
       const stage = e.target.getStage();
       const pointer = stage.getPointerPosition();
       if (!pointer) return;
 
-      // 🔥 Convert canvas coords → DOM coords
+      // Convert canvas coords → DOM coords
       const stageBox = stage.container().getBoundingClientRect();
 
       const domX = stageBox.left + pointer.x;
@@ -151,14 +200,16 @@ const Whiteboard = () => {
       const newTextElement: DrawingElement = {
         id: nanoid(),
         tool: 'text',
-        color: color,
+        color: color, // Use the main color state
         size: 16,
         points: [],
         x: pointer.x,
         y: pointer.y,
         text: '',
         fontSize: 16,
-        fontFamily: 'Arial',
+        fontFamily: fontFamily,
+        fontStyle: getFontStyle(),
+        textDecoration: isUnderline ? 'underline' : 'none',
         rotation: 0,
         scaleX: 1,
         scaleY: 1,
@@ -343,7 +394,6 @@ const Whiteboard = () => {
         autoFocus
         value={textInput}
         onChange={(e) => setTextInput(e.target.value)}
-        // onBlur={handleTextSubmit}
         onKeyDown={handleKeyDown}
         style={{
           position: 'fixed',
@@ -352,8 +402,11 @@ const Whiteboard = () => {
           border: '2px solid #007bff',
           padding: '4px 8px',
           fontSize: '16px',
-          fontFamily: 'Arial',
-          color: color,
+          fontFamily: fontFamily,
+          fontWeight: isBold ? 'bold' : 'normal',
+          fontStyle: isItalic ? 'italic' : 'normal',
+          textDecoration: isUnderline ? 'underline' : 'none',
+          color: color, // Use main color state
           background: 'white',
           outline: 'none',
           minWidth: '100px',
@@ -365,6 +418,7 @@ const Whiteboard = () => {
     );
   };
 
+  
 
   return (
     <>
@@ -403,9 +457,6 @@ const Whiteboard = () => {
                 const ry = Math.abs((el.height||0)/2);
 
                 if (el.tool === 'pen' || el.tool === 'eraser') {
-                    // Use standard Line for brush effects (tension support) instead of SVG Path if we want smoothness
-                    // But getStroke is better for calligraphy. For simple dotted lines, we might prefer Konva Line.
-                    // Here we stick to Path for stroke but apply opacity/dash.
                     return <Path {...commonProps} data={getSvgPathFromStroke(el.points, el.size)} fill={el.color} stroke={el.color} tension={el.tension} />;
                 }
 
@@ -419,12 +470,28 @@ const Whiteboard = () => {
                       text={el.text || ''}
                       fontSize={el.fontSize || 16}
                       fontFamily={el.fontFamily || 'Arial'}
+                      fontStyle={el.fontStyle || 'normal'}
+                      textDecoration={el.textDecoration || 'none'}
                       fill={el.color}
                       draggable={tool === 'select'}
                       rotation={el.rotation || 0}
                       scaleX={el.scaleX || 1}
                       scaleY={el.scaleY || 1}
                       opacity={el.opacity ?? 1}
+                      onClick={(e: any) => { 
+                        if (tool === 'select') { 
+                          e.cancelBubble = true; 
+                          setSelectedId(el.id); 
+                        } 
+                      }}
+                      onTap={(e: any) => { 
+                        if (tool === 'select') { 
+                          e.cancelBubble = true; 
+                          setSelectedId(el.id); 
+                        } 
+                      }}
+                      onDragEnd={(e: any) => handleTransformEnd(e, el.id)}
+                      onTransformEnd={(e: any) => handleTransformEnd(e, el.id)}
                       listening={tool === 'select' || tool === 'eraser'}
                     />
                   );
@@ -467,7 +534,52 @@ const Whiteboard = () => {
         {/* --- MAIN TOOLBAR --- */}
         <div style={{ position: 'absolute', top: 0, left: 0, zIndex: 10, width: '100%', pointerEvents: 'none' }}>
             <div style={{ pointerEvents: 'auto' }}>
-                 <Toolbar tool={tool} setTool={setTool} color={color} setColor={setColor} size={size} setSize={setSize} />
+                 <Toolbar 
+                   tool={tool} 
+                   setTool={setTool} 
+                   color={color} 
+                   setColor={setColor} 
+                   size={size} 
+                   setSize={setSize}
+                   // Text formatting props
+                   isBold={isBold}
+                   setIsBold={(val) => {
+                     setIsBold(val);
+                     if (selectedId) {
+                       const fontStyle = val && isItalic ? 'bold italic' : val ? 'bold' : isItalic ? 'italic' : 'normal';
+                       updateTextFormatting({ fontStyle });
+                     }
+                   }}
+                   isItalic={isItalic}
+                   setIsItalic={(val) => {
+                     setIsItalic(val);
+                     if (selectedId) {
+                       const fontStyle = isBold && val ? 'bold italic' : isBold ? 'bold' : val ? 'italic' : 'normal';
+                       updateTextFormatting({ fontStyle });
+                     }
+                   }}
+                   isUnderline={isUnderline}
+                   setIsUnderline={(val) => {
+                     setIsUnderline(val);
+                     if (selectedId) {
+                       updateTextFormatting({ textDecoration: val ? 'underline' : 'none' });
+                     }
+                   }}
+                   fontFamily={fontFamily}
+                   setFontFamily={(val) => {
+                     setFontFamily(val);
+                     if (selectedId) {
+                       updateTextFormatting({ fontFamily: val });
+                     }
+                   }}
+                   onColorChange={(newColor) => {
+                     setColor(newColor);
+                     if (selectedId) {
+                       updateTextFormatting({ color: newColor });
+                     }
+                   }}
+                   selectedElement={selectedId ? elements.find(el => el.id === selectedId) : null}
+                 />
             </div>
         </div>
 
