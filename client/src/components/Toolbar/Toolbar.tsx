@@ -22,6 +22,10 @@ interface ToolbarProps {
   setIsItalic?: (val: boolean) => void;
   isUnderline?: boolean;
   setIsUnderline?: (val: boolean) => void;
+  underlineStyle?: 'solid' | 'dotted' | 'dashed' | 'wavy';
+  setUnderlineStyle?: (val: 'solid' | 'dotted' | 'dashed' | 'wavy') => void;
+  underlineThickness?: number;
+  setUnderlineThickness?: (val: number) => void;
   fontFamily?: string;
   setFontFamily?: (val: string) => void;
   onColorChange?: (color: string) => void;
@@ -32,6 +36,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   tool, setTool, color, setColor, size, setSize,
   isBold, setIsBold, 
   isItalic, setIsItalic, isUnderline, setIsUnderline,
+  underlineStyle, setUnderlineStyle, underlineThickness, setUnderlineThickness,
   fontFamily, setFontFamily, onColorChange, selectedElement
 }) => {
   const isSizeActive = (s: number) => size === s;
@@ -180,7 +185,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 border: '1px solid #ddd',
                 fontSize: '12px',
                 cursor: 'pointer',
-                backgroundColor: 'white'
+                backgroundColor: 'white',
+                minWidth: '120px'
               }}
             >
               <option value="Arial">Arial</option>
@@ -191,6 +197,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
               <option value="Comic Sans MS">Comic Sans MS</option>
               <option value="Impact">Impact</option>
               <option value="Helvetica">Helvetica</option>
+              <option value="Trebuchet MS">Trebuchet MS</option>
+              <option value="Lucida Console">Lucida Console</option>
+              <option value="Palatino">Palatino</option>
+              <option value="Garamond">Garamond</option>
+              <option value="Bookman">Bookman</option>
+              <option value="Tahoma">Tahoma</option>
+              <option value="Century Gothic">Century Gothic</option>
             </select>
 
             {/* Bold Button */}
@@ -229,24 +242,69 @@ const Toolbar: React.FC<ToolbarProps> = ({
               <Italic size={18} />
             </button>
 
-            {/* Underline Button */}
-            <button
-              onClick={() => setIsUnderline?.(!isUnderline)}
-              title="Underline"
-              style={{
-                backgroundColor: isUnderline ? '#e2e8f0' : 'transparent',
-                border: 'none',
-                padding: '6px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Underline size={18} />
-            </button>
+            {/* Underline Button with Dropdown */}
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <button
+                onClick={() => setIsUnderline?.(!isUnderline)}
+                title="Underline"
+                style={{
+                  backgroundColor: isUnderline ? '#e2e8f0' : 'transparent',
+                  border: 'none',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <Underline size={18} />
+              </button>
+            </div>
           </div>
+
+          {/* Underline Customization (shown when underline is active) */}
+          {isUnderline && (
+            <>
+              <div style={{ width: '1px', height: '24px', backgroundColor: '#e5e7eb' }}></div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* Underline Style */}
+                <select
+                  value={underlineStyle || 'solid'}
+                  onChange={(e) => setUnderlineStyle?.(e.target.value as any)}
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    backgroundColor: 'white'
+                  }}
+                  title="Underline Style"
+                >
+                  <option value="solid">Solid</option>
+                  <option value="dotted">Dotted</option>
+                  <option value="dashed">Dashed</option>
+                  <option value="wavy">Wavy</option>
+                </select>
+
+                {/* Underline Thickness */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '11px', color: '#666' }}>Thickness:</span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="5"
+                    value={underlineThickness || 1}
+                    onChange={(e) => setUnderlineThickness?.(Number(e.target.value))}
+                    style={{ width: '60px' }}
+                  />
+                  <span style={{ fontSize: '11px', color: '#333', minWidth: '15px' }}>{underlineThickness || 1}</span>
+                </div>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

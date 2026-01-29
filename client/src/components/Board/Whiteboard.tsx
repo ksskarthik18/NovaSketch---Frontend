@@ -24,6 +24,13 @@ const GlobalStyles = () => (
     .btn-group { display: flex; gap: 5px; flex-wrap: wrap; }
     .btn { padding: 5px 10px; border: 1px solid #ddd; background: #eee; cursor: pointer; font-size: 11px; border-radius: 4px; }
     .btn.active { background: #007bff; color: white; border-color: #007bff; }
+    
+    /* Better canvas text rendering */
+    canvas {
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
   `}</style>
 );
 
@@ -63,6 +70,8 @@ interface DrawingElement {
   fontFamily?: string;
   fontStyle?: string; // 'normal', 'bold', 'italic', 'bold italic'
   textDecoration?: string; // 'none', 'underline'
+  underlineStyle?: 'solid' | 'dotted' | 'dashed' | 'wavy';
+  underlineThickness?: number;
 }
 
 
@@ -94,7 +103,31 @@ const Whiteboard = () => {
   const [isBold, setIsBold] = useState(false);
   const [isItalic, setIsItalic] = useState(false);
   const [isUnderline, setIsUnderline] = useState(false);
+  const [underlineStyle, setUnderlineStyle] = useState<'solid' | 'dotted' | 'dashed' | 'wavy'>('solid');
+  const [underlineThickness, setUnderlineThickness] = useState(1);
   const [fontFamily, setFontFamily] = useState('Arial');
+
+  // --- NEW: Update text element formatting in real-time during editing ---
+  useEffect(() => {
+    if (editingTextId) {
+      // Update the text element's formatting as user changes it
+      const index = yElements.current.toArray().findIndex(el => el.id === editingTextId);
+      if (index !== -1) {
+        const oldEl = yElements.current.get(index);
+        const newEl = {
+          ...oldEl,
+          color: color,
+          fontFamily: fontFamily,
+          fontStyle: getFontStyle(),
+          textDecoration: isUnderline ? 'underline' : 'none',
+          underlineStyle: underlineStyle,
+          underlineThickness: underlineThickness,
+        };
+        yElements.current.delete(index, 1);
+        yElements.current.insert(index, [newEl]);
+      }
+    }
+  }, [color, fontFamily, isBold, isItalic, isUnderline, underlineStyle, underlineThickness, editingTextId]);
 
   const isDrawing = useRef(false);
   const ydoc = useRef<Y.Doc>(new Y.Doc());
@@ -121,6 +154,8 @@ const Whiteboard = () => {
         setIsBold(fontStyle.includes('bold'));
         setIsItalic(fontStyle.includes('italic'));
         setIsUnderline(selectedElement.textDecoration === 'underline');
+        setUnderlineStyle(selectedElement.underlineStyle || 'solid');
+        setUnderlineThickness(selectedElement.underlineThickness || 1);
         setFontFamily(selectedElement.fontFamily || 'Arial');
       }
     }
@@ -210,6 +245,8 @@ const Whiteboard = () => {
         fontFamily: fontFamily,
         fontStyle: getFontStyle(),
         textDecoration: isUnderline ? 'underline' : 'none',
+        underlineStyle: underlineStyle,
+        underlineThickness: underlineThickness,
         rotation: 0,
         scaleX: 1,
         scaleY: 1,
@@ -358,11 +395,21 @@ const Whiteboard = () => {
         const index = yElements.current.toArray().findIndex(el => el.id === editingTextId);
         if (index !== -1) yElements.current.delete(index, 1);
       } else {
-        // Update the text element with the typed content
+        // Update the text element with the typed content AND current formatting
         const index = yElements.current.toArray().findIndex(el => el.id === editingTextId);
         if (index !== -1) {
           const oldEl = yElements.current.get(index);
-          const newEl = { ...oldEl, text: textInput };
+          const newEl = { 
+            ...oldEl, 
+            text: textInput,
+            // Apply current formatting states
+            color: color,
+            fontFamily: fontFamily,
+            fontStyle: getFontStyle(),
+            textDecoration: isUnderline ? 'underline' : 'none',
+            underlineStyle: underlineStyle,
+            underlineThickness: underlineThickness,
+          };
           yElements.current.delete(index, 1);
           yElements.current.insert(index, [newEl]);
         }
@@ -406,6 +453,9 @@ const Whiteboard = () => {
           fontWeight: isBold ? 'bold' : 'normal',
           fontStyle: isItalic ? 'italic' : 'normal',
           textDecoration: isUnderline ? 'underline' : 'none',
+          textDecorationStyle: isUnderline ? underlineStyle : 'solid',
+          textDecorationThickness: isUnderline ? `${underlineThickness}px` : 'auto',
+          textUnderlineOffset: isUnderline ? '2px' : 'auto',
           color: color, // Use main color state
           background: 'white',
           outline: 'none',
@@ -461,39 +511,115 @@ const Whiteboard = () => {
                 }
 
                 if (el.tool === 'text') {
+                  // Get font weight from fontStyle
+                  const isBold = (el.fontStyle || 'normal').includes('bold');
+                  const isItalic = (el.fontStyle || 'normal').includes('italic');
+                  const hasUnderline = (el.textDecoration || 'none') === 'underline';
+                  
+                  const fontStyleValue = isItalic ? 'italic' : 'normal';
+                  const fontWeight = isBold ? 'bold' : 'normal';
+                  
+                  // Calculate text width for underline (approximate)
+                  const textWidth = (el.text || '').length * (el.fontSize || 16) * 0.55;
+                  const underlineY = (el.fontSize || 16) + 2;
+                  
+                  // Get underline properties
+                  const uStyle = el.underlineStyle || 'solid';
+                  const uThickness = el.underlineThickness || 1;
+                  
                   return (
-                    <Text
-                      key={el.id}
-                      id={el.id}
-                      x={el.x}
-                      y={el.y}
-                      text={el.text || ''}
-                      fontSize={el.fontSize || 16}
-                      fontFamily={el.fontFamily || 'Arial'}
-                      fontStyle={el.fontStyle || 'normal'}
-                      textDecoration={el.textDecoration || 'none'}
-                      fill={el.color}
-                      draggable={tool === 'select'}
-                      rotation={el.rotation || 0}
-                      scaleX={el.scaleX || 1}
-                      scaleY={el.scaleY || 1}
-                      opacity={el.opacity ?? 1}
-                      onClick={(e: any) => { 
-                        if (tool === 'select') { 
-                          e.cancelBubble = true; 
-                          setSelectedId(el.id); 
-                        } 
-                      }}
-                      onTap={(e: any) => { 
-                        if (tool === 'select') { 
-                          e.cancelBubble = true; 
-                          setSelectedId(el.id); 
-                        } 
-                      }}
-                      onDragEnd={(e: any) => handleTransformEnd(e, el.id)}
-                      onTransformEnd={(e: any) => handleTransformEnd(e, el.id)}
-                      listening={tool === 'select' || tool === 'eraser'}
-                    />
+                    <React.Fragment key={el.id}>
+                      <Text
+                        id={el.id}
+                        x={el.x}
+                        y={el.y}
+                        text={el.text || ''}
+                        fontSize={el.fontSize || 16}
+                        fontFamily={el.fontFamily || 'Arial'}
+                        fontStyle={`${fontStyleValue} ${fontWeight}`}
+                        fill={el.color}
+                        // Add stroke for bold text to make it thicker
+                        stroke={isBold ? el.color : undefined}
+                        strokeWidth={isBold ? 0.5 : 0}
+                        draggable={tool === 'select'}
+                        rotation={el.rotation || 0}
+                        scaleX={el.scaleX || 1}
+                        scaleY={el.scaleY || 1}
+                        opacity={el.opacity ?? 1}
+                        // Single click to select
+                        onClick={(e: any) => { 
+                          if (tool === 'select') { 
+                            e.cancelBubble = true; 
+                            setSelectedId(el.id); 
+                          } 
+                        }}
+                        onTap={(e: any) => { 
+                          if (tool === 'select') { 
+                            e.cancelBubble = true; 
+                            setSelectedId(el.id); 
+                          } 
+                        }}
+                        // Double click to edit text
+                        onDblClick={(e: any) => {
+                          if (tool === 'select') {
+                            e.cancelBubble = true;
+                            const stage = e.target.getStage();
+                            const textNode = e.target;
+                            const stageBox = stage.container().getBoundingClientRect();
+                            
+                            // Get text position in DOM coordinates
+                            const textPos = textNode.getAbsolutePosition();
+                            const domX = stageBox.left + textPos.x;
+                            const domY = stageBox.top + textPos.y;
+                            
+                            // Load the text element's formatting into state
+                            setColor(el.color || '#000000');
+                            setFontFamily(el.fontFamily || 'Arial');
+                            
+                            const fontStyle = el.fontStyle || 'normal';
+                            setIsBold(fontStyle.includes('bold'));
+                            setIsItalic(fontStyle.includes('italic'));
+                            setIsUnderline((el.textDecoration || 'none') === 'underline');
+                            setUnderlineStyle(el.underlineStyle || 'solid');
+                            setUnderlineThickness(el.underlineThickness || 1);
+                            
+                            // Enter edit mode
+                            setEditingTextId(el.id);
+                            setTextInput(el.text || '');
+                            setTextPosition({ x: domX, y: domY });
+                            setSelectedId(null);
+                          }
+                        }}
+                        onDragEnd={(e: any) => handleTransformEnd(e, el.id)}
+                        onTransformEnd={(e: any) => handleTransformEnd(e, el.id)}
+                        listening={tool === 'select' || tool === 'eraser'}
+                      />
+                      {/* Custom Underline with styles */}
+                      {hasUnderline && el.text && (
+                        <Line
+                          points={[
+                            el.x,
+                            el.y + underlineY,
+                            el.x + textWidth,
+                            el.y + underlineY
+                          ]}
+                          stroke={el.color}
+                          strokeWidth={uThickness}
+                          dash={
+                            uStyle === 'dotted' ? [2, 4] :
+                            uStyle === 'dashed' ? [10, 5] :
+                            uStyle === 'wavy' ? [] : undefined
+                          }
+                          tension={uStyle === 'wavy' ? 0.8 : 0}
+                          bezier={uStyle === 'wavy'}
+                          scaleX={el.scaleX || 1}
+                          scaleY={el.scaleY || 1}
+                          rotation={el.rotation || 0}
+                          opacity={el.opacity ?? 1}
+                          listening={false}
+                        />
+                      )}
+                    </React.Fragment>
                   );
                 }
 
@@ -545,36 +671,64 @@ const Whiteboard = () => {
                    isBold={isBold}
                    setIsBold={(val) => {
                      setIsBold(val);
-                     if (selectedId) {
-                       const fontStyle = val && isItalic ? 'bold italic' : val ? 'bold' : isItalic ? 'italic' : 'normal';
-                       updateTextFormatting({ fontStyle });
+                     // Always update selected text element
+                     const selectedElement = selectedId ? elements.find(el => el.id === selectedId) : null;
+                     if (selectedElement && selectedElement.tool === 'text') {
+                       const newFontStyle = val && isItalic ? 'bold italic' : val ? 'bold' : isItalic ? 'italic' : 'normal';
+                       updateTextFormatting({ fontStyle: newFontStyle });
                      }
                    }}
                    isItalic={isItalic}
                    setIsItalic={(val) => {
                      setIsItalic(val);
-                     if (selectedId) {
-                       const fontStyle = isBold && val ? 'bold italic' : isBold ? 'bold' : val ? 'italic' : 'normal';
-                       updateTextFormatting({ fontStyle });
+                     // Always update selected text element
+                     const selectedElement = selectedId ? elements.find(el => el.id === selectedId) : null;
+                     if (selectedElement && selectedElement.tool === 'text') {
+                       const newFontStyle = isBold && val ? 'bold italic' : isBold ? 'bold' : val ? 'italic' : 'normal';
+                       updateTextFormatting({ fontStyle: newFontStyle });
                      }
                    }}
                    isUnderline={isUnderline}
                    setIsUnderline={(val) => {
                      setIsUnderline(val);
-                     if (selectedId) {
+                     // Always update selected text element
+                     const selectedElement = selectedId ? elements.find(el => el.id === selectedId) : null;
+                     if (selectedElement && selectedElement.tool === 'text') {
                        updateTextFormatting({ textDecoration: val ? 'underline' : 'none' });
+                     }
+                   }}
+                   underlineStyle={underlineStyle}
+                   setUnderlineStyle={(val) => {
+                     setUnderlineStyle(val);
+                     // Always update selected text element
+                     const selectedElement = selectedId ? elements.find(el => el.id === selectedId) : null;
+                     if (selectedElement && selectedElement.tool === 'text') {
+                       updateTextFormatting({ underlineStyle: val });
+                     }
+                   }}
+                   underlineThickness={underlineThickness}
+                   setUnderlineThickness={(val) => {
+                     setUnderlineThickness(val);
+                     // Always update selected text element
+                     const selectedElement = selectedId ? elements.find(el => el.id === selectedId) : null;
+                     if (selectedElement && selectedElement.tool === 'text') {
+                       updateTextFormatting({ underlineThickness: val });
                      }
                    }}
                    fontFamily={fontFamily}
                    setFontFamily={(val) => {
                      setFontFamily(val);
-                     if (selectedId) {
+                     // Always update selected text element
+                     const selectedElement = selectedId ? elements.find(el => el.id === selectedId) : null;
+                     if (selectedElement && selectedElement.tool === 'text') {
                        updateTextFormatting({ fontFamily: val });
                      }
                    }}
                    onColorChange={(newColor) => {
                      setColor(newColor);
-                     if (selectedId) {
+                     // Always update selected text element
+                     const selectedElement = selectedId ? elements.find(el => el.id === selectedId) : null;
+                     if (selectedElement && selectedElement.tool === 'text') {
                        updateTextFormatting({ color: newColor });
                      }
                    }}
